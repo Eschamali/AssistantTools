@@ -13,6 +13,7 @@ Option Explicit
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：・既にコメントがある場合は、削除します。
 '            ・絵文字等の「Unicode サロゲート ペア」を含む数式は、サポートしません
+'            ・BYROW関数等で使える「イータ縮小ラムダ関数」の色付けには非対応です
 '***************************************************************************************************
 Sub FormuraIntoMemo()
 Attribute FormuraIntoMemo.VB_Description = "数式のあるセルをプレビューします。"
@@ -22,6 +23,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
 
 
     '-------------------------------------------------0.設定値-------------------------------------------------
+'    Call StartOrLapTimer("数式をコメント表示")
 
 
     '記述するフォントサイズを指定
@@ -74,6 +76,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
 
 
         '-------------------------------------------------3.装飾箇所調査処理-------------------------------------------------
+'        Call StartOrLapTimer("準備完了")
 
 
         '文字数分、所定の処理を行う
@@ -153,6 +156,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
 
 
         '-------------------------------------------------4.メモ準備-------------------------------------------------
+'        Call StartOrLapTimer("文字の調査完了")
 
 
         '色の変化による画面更新を無効化する
@@ -176,6 +180,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
 
 
             '-------------------------------------------------5.3で調査したフラグを元に色付け-------------------------------------------------
+'            Call StartOrLapTimer("メモの挿入完了")
 
 
             Dim StringCount As Integer  '文字数カウント用
@@ -213,19 +218,19 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
                     'カウントした分、ずらす
                     i = i - 1 + StringCount
 
-                
+
                 '　カンマ
                 ElseIf Flag_Comma(i) Then
                     '1文字なので、そのまま色付けへ
                     .Shape.TextFrame.Characters(Start:=i, Length:=1).Font.Color = Color_Comma
-            
-                
+
+
                 '　＆記号
                 ElseIf Flag_Ampersand(i) Then
                     '1文字なので、そのまま色付けへ
                     .Shape.TextFrame.Characters(Start:=i, Length:=1).Font.Color = Color_Ampersand
-                
-                
+
+
                 '　＃記号
                 ElseIf Flag_NumberSign(i) Then
                     '1文字なので、そのまま色付けへ
@@ -238,6 +243,9 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
     
     End With
 
+'    Call StartOrLapTimer("メモの色付け完了")
+
     '画面更新をON
     Application.ScreenUpdating = True
+'    Call EndTimer("画面更新して、処理終了")
 End Sub
