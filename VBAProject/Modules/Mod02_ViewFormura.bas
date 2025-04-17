@@ -27,11 +27,12 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
     '記述するフォントサイズを指定
     Const MemoFontSize = 22
 
-    '色設定
+    '色設定(必要に応じて、追加してください)
     Const Color_FunctionName As Long = vbBlue   '関数名：青
     Const Color_String As Long = rgbBrown       '文字列：茶
     Const Color_Comma As Long = vbRed           'カンマ：赤
     Const Color_Ampersand As Long = vbMagenta   '＆記号：マゼンダ
+    Const Color_NumberSign As Long = vbCyan     '＃記号：シアン
 
 
     '-------------------------------------------------1.変数用意-------------------------------------------------
@@ -42,11 +43,12 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
     Dim charNum As Integer              'セルに含むことができる合計文字数(32767)に準拠してあえて、Integer
     Dim CountDoubleQuotation As Integer '今の文字位置が、文字列かそうじゃないか判定
 
-    '判定用(必要に応じて、追加してください)
+    '判定用(前述で用意した「色設定」分)
     Dim Flag_FunctionName() As Boolean  '1文字1文字が、関数名に当てはまるかフラグ
     Dim Flag_String() As Boolean        '1文字1文字が、文字列に当てはまるかフラグ
     Dim Flag_Comma() As Boolean         '1文字1文字が、カンマに当てはまるかフラグ
     Dim Flag_Ampersand() As Boolean     '1文字1文字が、＆記号に当てはまるかフラグ
+    Dim Flag_NumberSign() As Boolean    '1文字1文字が、＃記号に当てはまるかフラグ
 
 
     '-------------------------------------------------2.配列準備-------------------------------------------------
@@ -62,12 +64,13 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
             Exit Sub
         End If
 
-        '文字数を取得し、それを配列数として定義する
+        '文字数を取得し、それを配列数として定義する(前述で用意した「色設定」分)
         charNum = Len(A_Formula)
         ReDim Flag_FunctionName(1 To charNum)
         ReDim Flag_String(1 To charNum)
         ReDim Flag_Comma(1 To charNum)
         ReDim Flag_Ampersand(1 To charNum)
+        ReDim Flag_NumberSign(1 To charNum)
 
 
         '-------------------------------------------------3.装飾箇所調査処理-------------------------------------------------
@@ -91,7 +94,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
             ElseIf CountDoubleQuotation Mod 2 = 0 Then
                 '数式エリアで、特定の記号を検知したら、所定の処理を行う
                 Select Case nowChar
-                    '「(」があったら、その前の文字位置に関数名があるとする
+                    '-------------------------------------------------3-1.関数名、調査処理-------------------------------------------------
                     Case "("
                         '関数名の最終文字位置から、1文字ずつ戻して始点(関数名の最初文字位置)を探す
                         For j = i - 1 To 1 Step -1
@@ -121,7 +124,8 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
 
                             End Select
                         Next
-                            
+                         
+                    '-------------------------------------------------3-2.単一文字、調査処理-------------------------------------------------
                     '「,」があったら、フラグ付けする
                     Case ","
                         Flag_Comma(i) = True
@@ -130,6 +134,10 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
                     Case "&"
                         Flag_Ampersand(i) = True
 
+                    '「#」があったら、フラグ付けする
+                    Case "#"
+                        Flag_NumberSign(i) = True
+
                     Case Else
                         '何もしない
 
@@ -137,6 +145,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
                 
             '奇数なら、文字列エリアとする。
             Else
+                '文字列フラグ
                 Flag_String(i) = True
             End If
         
@@ -215,6 +224,12 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
                 ElseIf Flag_Ampersand(i) Then
                     '1文字なので、そのまま色付けへ
                     .Shape.TextFrame.Characters(Start:=i, Length:=1).Font.Color = Color_Ampersand
+                
+                
+                '　＃記号
+                ElseIf Flag_NumberSign(i) Then
+                    '1文字なので、そのまま色付けへ
+                    .Shape.TextFrame.Characters(Start:=i, Length:=1).Font.Color = Color_NumberSign
                 
                 End If
             Next
