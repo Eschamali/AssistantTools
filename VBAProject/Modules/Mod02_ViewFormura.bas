@@ -108,7 +108,7 @@ Attribute FormuraIntoMemo.VB_ProcData.VB_Invoke_Func = "m\n14"
                             Select Case nowChar
                                 '始点位置が検出されたら、調査終了とする
                                 '※ここに始点位置であろうパターンをカンマ区切りで1文字ずつ、列挙してください…
-                                Case "(", ",", "=", vbLf, " ", "+", "-", "*", "/", "^"
+                                Case "(", ",", "=", vbLf, " ", "&", "+", "-", "*", "/", "^"
                                     Exit For
 
                                 Case Else
