@@ -13,7 +13,7 @@ Option Explicit
 
 
 '***************************************************************************************************
-'                               ■■■ SHCreateDirectoryEx 宣言 ■■■
+'                               ■■■ SHCreateDirectoryEx API宣言 ■■■
 '***************************************************************************************************
 Private Declare PtrSafe Function SHCreateDirectoryEx Lib "Shell32" _
     Alias "SHCreateDirectoryExA" _
@@ -24,7 +24,30 @@ Private Declare PtrSafe Function SHCreateDirectoryEx Lib "Shell32" _
 
 
 '***************************************************************************************************
-'                         ■■■ WindowsAPIを使えるように関数を簡易実装 ■■■
+'                           ■■■ クリップボードにアクセスする API宣言 ■■■
+'***************************************************************************************************
+Public Declare PtrSafe Function OpenClipboard Lib "user32" (ByVal hWnd As LongPtr) As Long
+Public Declare PtrSafe Function CloseClipboard Lib "user32" () As Long
+Public Declare PtrSafe Function GetClipboardData Lib "user32" (ByVal wFormat As Long) As LongPtr
+Public Declare PtrSafe Function RegisterClipboardFormat Lib "user32" Alias "RegisterClipboardFormatA" (ByVal lpString As String) As Long
+Public Declare PtrSafe Function GlobalLock Lib "kernel32" (ByVal hMem As LongPtr) As LongPtr
+Public Declare PtrSafe Function GlobalUnlock Lib "kernel32" (ByVal hMem As LongPtr) As Long
+Public Declare PtrSafe Function GlobalSize Lib "kernel32" (ByVal hMem As LongPtr) As Long
+
+
+
+'***************************************************************************************************
+'           ■■■ 代替の CopyMemory：ループではなくバイト配列に直接書き込み API宣言 ■■■
+'***************************************************************************************************
+Public Declare PtrSafe Sub RtlMoveMemoryArray Lib "kernel32" Alias "RtlMoveMemory" ( _
+    ByRef Destination As Any, _
+    ByVal Source As LongPtr, _
+    ByVal Length As Long)
+
+
+
+'***************************************************************************************************
+'                       ■■■ WindowsAPIを使えるように、ヘルパー実装 ■■■
 '***************************************************************************************************
 '* 機能：SHCreateDirectoryEx　を利用して多階層フォルダを一気に作成します。
 '---------------------------------------------------------------------------------------------------
