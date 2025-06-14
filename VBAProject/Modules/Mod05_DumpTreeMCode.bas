@@ -10,8 +10,8 @@ Option Explicit
 '***************************************************************************************************
 '                               ■■■ グローバル定義 ■■■
 '***************************************************************************************************
-Dim クエリ名に対するグループパス情報    As Scripting.Dictionary
-Dim グループパスに対する説明文          As Scripting.Dictionary
+Public クエリ名に対するグループパス情報    As Scripting.Dictionary
+Public グループパスに対する説明文          As Scripting.Dictionary
 
 
 
@@ -113,6 +113,45 @@ Private Function BytesToString(bytes() As Byte, Optional encoding As String = "U
     End With
 End Function
 
+'***************************************************************************************************
+'* 機能　　：指定した引数で、ファイル保存します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：WriteText      書き込む内容を渡します。
+'            SaveFilePass   入力した絶対パスにファイルを保存します。
+'            OverWrite      上書きしたくない場合は、Falseで
+'***************************************************************************************************
+Private Sub SaveFile(writeText As String, ByVal SaveFilePass As String, Optional OverWrite As Boolean = True)
+    '上書きしない場合、後続処理しない
+    If Not OverWrite And Dir(SaveFilePass, vbNormal) <> "" Then Exit Sub
+    
+    '文字なしも、後続処理しない
+    If writeText = "" Then Exit Sub
+
+    Dim tmp() As Byte 'BOM付きを外すための一時格納用
+    With CreateObject("ADODB.Stream")
+        '書き込み形式の設定
+        .Charset = "UTF-8" 'UTF-8
+        .Type = 2 'テキストモード
+        .Open '上記の設定で、ストリームを開く
+
+        'レスポンス結果を書き込む(末尾に改行コードなし)
+        .writeText writeText, 0
+        
+        'BOM付きを外す処理
+        .Position = 0 'ストリームの位置を0にセット
+        .Type = 1 'データの種類をバイナリデータに変更
+        .Position = 3 'ストリームの位置を3にセットして、BOMデータを飛ばす
+        tmp = .Read 'ストリームの内容を一時格納用変数に保存。先程セットした始点3から最後まで
+        .Close '一旦ストリームを閉じる（リセット）
+
+        .Open 'ストリームを開く
+        .Write tmp 'ストリームに一時格納したデータを流し込む
+        .SaveToFile SaveFilePass, 2 'ファイルに上書き保存
+        .Close
+    End With
+
+End Sub
+
 
 
 '***************************************************************************************************
@@ -169,12 +208,12 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
         Set parentNode = groupNode.parentNode
         
         'このグループ自身を含めてパスを作る準備
-        groupPath = "/" & groupNode.Attributes.getNamedItem(クエリグループ名_属性名).Text
+        groupPath = "\" & groupNode.Attributes.getNamedItem(クエリグループ名_属性名).Text
     
         '先頭の要素まで、遡って探索します
         Do While Not parentNode Is Nothing
             '"QueryGroup"要素ゾーンに入ったら、パスを連結させます
-            If parentNode.nodeName = クエリグループ名_要素名 Then groupPath = "/" & parentNode.Attributes.getNamedItem(クエリグループ名_属性名).Text & groupPath
+            If parentNode.nodeName = クエリグループ名_要素名 Then groupPath = "\" & parentNode.Attributes.getNamedItem(クエリグループ名_属性名).Text & groupPath
             
             '現在位置のノードを登録
             Set parentNode = parentNode.parentNode
@@ -186,7 +225,7 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
 
         '登録
         グループパスに対する説明文.Add groupPath, selfDescText
-        Debug.Print "グループパスに対する説明文：" & groupPath & " → " & selfDescText
+        'Debug.Print "グループパスに対する説明文：" & groupPath & " → " & selfDescText
     Next
     
     
@@ -197,13 +236,13 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
 
     '必要な変数を用意
     Dim queryNodes As MSXML2.IXMLDOMNodeList: Set queryNodes = xmlDoc.SelectNodes("//d:" & クエリ名_要素名)      '"Query"という要素名を一覧化
-    Dim queryName As String
+    Dim QueryName As String
 
     '探索開始
     Dim queryNode As MSXML2.IXMLDOMNode
     For Each queryNode In queryNodes
         '現在位置の、"Name"属性値を取得
-        queryName = queryNode.Attributes.getNamedItem(クエリ名_属性名).Text
+        QueryName = queryNode.Attributes.getNamedItem(クエリ名_属性名).Text
         
         'グループパス取得準備として、現在のノード情報を取得
         Set parentNode = queryNode.parentNode
@@ -214,7 +253,7 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
         '先頭の要素まで、遡って探索します
         Do While Not parentNode Is Nothing
             '"QueryGroup"要素ゾーンに入ったら、パスを連結させます
-            If parentNode.nodeName = クエリグループ名_要素名 Then groupPath = "/" & parentNode.Attributes.getNamedItem(クエリグループ名_属性名).Text & groupPath
+            If parentNode.nodeName = クエリグループ名_要素名 Then groupPath = "\" & parentNode.Attributes.getNamedItem(クエリグループ名_属性名).Text & groupPath
 
             '現在位置のノードを登録
             Set parentNode = parentNode.parentNode
@@ -222,14 +261,14 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
 
 
         '登録
-        クエリ名に対するグループパス情報.Add queryName, groupPath
-        Debug.Print "クエリ名に対するグループパス情報：" & queryName & " → " & groupPath
+        クエリ名に対するグループパス情報.Add QueryName, groupPath
+        'Debug.Print "クエリ名に対するグループパス情報：" & QueryName & " → " & groupPath
     Next
 
 
-    '--------------------------------------- 3.メタ情報を返り値とする ---------------------------------------
+    '--------------------------------------- 3.メタ情報を返り値とする  ---------------------------------------
     With xmlDoc
-        ParseMashupQueries = WorksheetFunction.TextJoin(",", True, _
+        ParseMashupPowerQuery = WorksheetFunction.TextJoin(",", True, _
                                 .SelectSingleNode("//d:Client").Text, _
                                 .SelectSingleNode("//d:Version").Text, _
                                 .SelectSingleNode("//d:MinVersion").Text, _
@@ -242,37 +281,38 @@ End Function
 
 
 '***************************************************************************************************
-'* 機能　　：指定した引数で、ファイル保存します。
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：WriteText      書き込む内容を渡します。
-'            SaveFilePass   入力した絶対パスにファイルを保存します。
-'            OverWrite      上書きしたくない場合は、Falseで
+'                       ■■■ タスクダイアログから呼び出す ■■■
 '***************************************************************************************************
-Private Sub SaveFile(writeText As String, ByVal SaveFilePass As String, Optional OverWrite As Boolean = True)
-    '上書きしない場合、後続処理しない
-    If Not OverWrite And Dir(SaveFilePass, vbNormal) <> "" Then Exit Sub
+'* 機能    ：PowerQuery構造XMLを解析します
+'---------------------------------------------------------------------------------------------------
+'* 引数    ：BasePath     保存先のベースフォルダパス
+'* 返り値  ：メタ情報     Client,Version,MinVersion,Culture,SafeCombine
+'                         ※取得に失敗すると、vbnullstring が返ります
+'***************************************************************************************************
+Function GetPowerQueryInfos(BasePath As String)
+    'PowerQueryの構造XMLデータを取得
+    Dim ResultXML As String: ResultXML = クリップボードからMashupFormat形式のデータを抽出する
+    
+    '説明文の保存ファイル名
+    Const 説明ファイル名 As String = "説明.txt"
+    
+    '情報があったら、次へ
+    If StrPtr(ResultXML) Then
+        'メタ情報を取得
+        GetPowerQueryInfos = ParseMashupPowerQuery(ResultXML)
+    
+        'グループ情報分、作成
+        Dim i As Long, FolderPaths
+        With グループパスに対する説明文
+            FolderPaths = .Keys
+            For i = .Count - 1 To 0 Step -1
+                'フォルダを作成
+                BatchCreationFolder BasePath & FolderPaths(i)
+                
+                '説明文を保存
+                SaveFile グループパスに対する説明文(FolderPaths(i)), BasePath & FolderPaths(i) & "\" & 説明ファイル名
+            Next
+        End With
+    End If
+End Function
 
-    Dim tmp() As Byte 'BOM付きを外すための一時格納用
-    With CreateObject("ADODB.Stream")
-        '書き込み形式の設定
-        .Charset = "UTF-8" 'UTF-8
-        .Type = 2 'テキストモード
-        .Open '上記の設定で、ストリームを開く
-
-        'レスポンス結果を書き込む(末尾に改行コードなし)
-        .writeText writeText, 0
-        
-        'BOM付きを外す処理
-        .Position = 0 'ストリームの位置を0にセット
-        .Type = 1 'データの種類をバイナリデータに変更
-        .Position = 3 'ストリームの位置を3にセットして、BOMデータを飛ばす
-        tmp = .Read 'ストリームの内容を一時格納用変数に保存。先程セットした始点3から最後まで
-        .Close '一旦ストリームを閉じる（リセット）
-
-        .Open 'ストリームを開く
-        .Write tmp 'ストリームに一時格納したデータを流し込む
-        .SaveToFile SaveFilePass, 2 'ファイルに上書き保存
-        .Close
-    End With
-
-End Sub

@@ -32,6 +32,8 @@ Attribute TaskDialogForDumpForm.VB_VarHelpID = -1
 Private OpeningBooksList                                        '現在開いているBookのリスト
 Private BeforeMARQUEE                       As Boolean          '以前にMARQUEEをしたか？
 
+Const M言語ファイル拡張子名                 As String = ".pqm"  '拡張子
+
 'ボタンID
 Private Enum ButtonAchievementID
     出力 = 101
@@ -45,6 +47,8 @@ Private Enum PowerQuery
     Comment
     M_Code
 End Enum
+
+
 
 '***************************************************************************************************
 '                                   ■■■ 表示構成 ■■■
@@ -69,7 +73,7 @@ Sub TaskDialogShow(BookNameList)
         .Init
 
         'Excelをハンドラにする
-        .ParenthWnd = Application.hWnd
+        '.ParenthWnd = Application.hWnd
     
         'ウィンドウタイトル
         .Title = "Mコードエクスポート"
@@ -112,6 +116,8 @@ Sub TaskDialogShow(BookNameList)
         '前回のパスを読み込む
         .InputText = Sh99_Setting.Range(RangeName_BeforePathName).Value
 
+        'スイッチング機能を導入
+        .VerifyText = "PowerQueryのグループ情報からフォルダ保存する"
 
         '表示させます
         .ShowDialog
@@ -159,9 +165,33 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                 'PowerQuery情報を取得
                 Dim Infos_PowerQuery: Infos_PowerQuery = GetPowerQueryCode(OpeningBooksList(TargetIndex))
                 
+                'フォルダ保存を行う場合は、前処理する
+                Dim MetaInfos As String
+                If CBool(TaskDialogForDumpForm.ResultVerify) Then
+                    '進捗更新
+                    TaskDialogForDumpForm.Footer = "フォルダを作成中..."
+                    DoEvents
+
+                    'フォルダ生成へ
+                    MetaInfos = Mod05_DumpTreeMCode.GetPowerQueryInfos(TaskDialogForDumpForm.ResultInput)
+                    
+                    'メタ情報なしの場合、処理中断
+                    If MetaInfos = "" Then
+                        '通知
+                        MsgBox "フォルダの作成に失敗しました", vbCritical, "PowerQuery XML取得エラー"
+                        
+                        '進捗更新
+                        TaskDialogForDumpForm.Footer = "Ready..."
+                        DoEvents
+                      
+                        Exit Sub
+                    End If
+                End If
+                
                 '進捗更新
                 TaskDialogForDumpForm.Footer = "0/" & UBound(Infos_PowerQuery)
-
+                DoEvents
+                
                 '情報がない場合(配列なし)はここで、終了
                 If Not (IsArray(Infos_PowerQuery)) Then Exit Sub
 
@@ -182,8 +212,15 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                         AddComment = ""
                     End If
 
-                    '保存処理
-                    SaveFile AddComment & Infos_PowerQuery(i, PowerQuery.M_Code), TaskDialogForDumpForm.ResultInput & "\" & Infos_PowerQuery(i, PowerQuery.QueryName)
+                    '保存準備
+                    Dim 保存ファイル名 As String: 保存ファイル名 = Infos_PowerQuery(i, PowerQuery.QueryName)
+                    
+                    '
+                    If CBool(TaskDialogForDumpForm.ResultVerify) Then
+                        SaveFile AddComment & Infos_PowerQuery(i, PowerQuery.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, Mod05_DumpTreeMCode.クエリ名に対するグループパス情報(Replace(保存ファイル名, M言語ファイル拡張子名, "")), 保存ファイル名)
+                    Else
+                        SaveFile AddComment & Infos_PowerQuery(i, PowerQuery.M_Code), TaskDialogForDumpForm.ResultInput & "\" & 保存ファイル名
+                    End If
                     
                     '進捗更新
                     TaskDialogForDumpForm.Footer = i & "/" & UBound(Infos_PowerQuery)
@@ -211,6 +248,20 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
     End Select
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：チェックボックス押下時の各種イベントです。
+'***************************************************************************************************
+Private Sub TaskDialogForDumpForm_VerificationClicked(ByVal Value As Long)
+    'ONにしたら、メッセージを問う
+    If CBool(Value) Then
+        MsgBox "この保存機能を利用するには、以下の操作を行う必要があります。" & vbCrLf & vbCrLf & _
+                    "1. リボンの「データ」タブから、「クエリと接続」を押下" & vbCrLf & _
+                    "2. 右側に出る「クエリと接続」ウィンドウが表示" & vbCrLf & _
+                    "3. Shift キーを押しながら、クリックして範囲選択する" & vbCrLf & _
+                    "4. 右クリックして、クリップボードにコピーする", vbExclamation, "必ずお読み下さい"
+    End If
+End Sub
+
 
 
 '***************************************************************************************************
@@ -236,9 +287,6 @@ Private Function GetPowerQueryCode(ByVal targetBookName As String)
     Dim i As Long
     Dim pq As WorkbookQuery
 
-    '拡張子
-    Const File拡張子 As String = ".pqm"
-
     'PowerQueryが設定されていない場合はここで、Stop
     If queryCount = 0 Then
         MsgBox "このBookにはPower Queryが定義されていません。", vbCritical, "Not found"
@@ -251,9 +299,9 @@ Private Function GetPowerQueryCode(ByVal targetBookName As String)
     'クエリごとに配列へ格納
     i = 1
     For Each pq In wb.Queries
-        resultArray(i, PowerQuery.QueryName) = pq.Name & File拡張子 'クエリ名
-        resultArray(i, PowerQuery.Comment) = pq.Description         'コメント
-        resultArray(i, PowerQuery.M_Code) = pq.Formula              'Mコード
+        resultArray(i, PowerQuery.QueryName) = pq.Name & M言語ファイル拡張子名  'クエリ名
+        resultArray(i, PowerQuery.Comment) = pq.Description                     'コメント
+        resultArray(i, PowerQuery.M_Code) = pq.Formula                          'Mコード
         
         'カウントUP
         i = i + 1
