@@ -82,7 +82,7 @@ Sub TaskDialogShow(BookNameList)
         .MainInstruction = "PowerQueryのソースコードを出力します"
 
         '内容
-        .Content = "現時点では、グループ出力には対応していません。" & vbCrLf & vbCrLf & "出力フォルダ："
+        .Content = "グループ情報を利用したフォルダへの保存は、ひと手間が必要です。" & vbCrLf & "詳細は、チェックボックスを ON にして下さい。" & vbCrLf & vbCrLf & "出力フォルダ："
 
         'TaskDialogで使えるコントロールを設定します
         .Flags = TDF_INPUT_BOX Or TDF_COMBO_BOX Or TDF_SHOW_PROGRESS_BAR Or TDF_SHOW_MARQUEE_PROGRESS_BAR Or TDF_EXPAND_FOOTER_AREA
@@ -110,6 +110,7 @@ Sub TaskDialogShow(BookNameList)
         '　初期選択位置を設定
         .ComboSetInitialItem 0
 
+
         'フッター部分に進捗用数値を出す用
         .Footer = "Ready..." & vbCrLf & vbCrLf
 
@@ -117,7 +118,8 @@ Sub TaskDialogShow(BookNameList)
         .InputText = Sh99_Setting.Range(RangeName_BeforePathName).Value
 
         'スイッチング機能を導入
-        .VerifyText = "PowerQueryのグループ情報からフォルダ保存する"
+        .VerifyText = "グループ情報からフォルダ保存する"
+
 
         '表示させます
         .ShowDialog
@@ -215,7 +217,7 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     '保存準備
                     Dim 保存ファイル名 As String: 保存ファイル名 = Infos_PowerQuery(i, PowerQuery.QueryName)
                     
-                    '
+                    'チェックボックスに応じて、フォルダへ保存するようにする
                     If CBool(TaskDialogForDumpForm.ResultVerify) Then
                         SaveFile AddComment & Infos_PowerQuery(i, PowerQuery.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, Mod05_DumpTreeMCode.クエリ名に対するグループパス情報(Replace(保存ファイル名, M言語ファイル拡張子名, "")), 保存ファイル名)
                     Else
@@ -225,6 +227,7 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     '進捗更新
                     TaskDialogForDumpForm.Footer = i & "/" & UBound(Infos_PowerQuery)
                     TaskDialog_UpdateProgressBar i, UBound(Infos_PowerQuery)
+                    DoEvents
                 Next
             
                 'パスを記憶させる
