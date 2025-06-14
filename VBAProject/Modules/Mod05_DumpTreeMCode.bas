@@ -74,13 +74,9 @@ Private Function クリップボードからMashupFormat形式のデータを抽
     'バイト配列から、テキストを取得
     Dim rawStr As String: rawStr = BytesToString(byteData)
 
-    ' バイナリの先頭にゴミが含まれている可能性があるため <?xml から探す
+    ' バイナリの先頭にゴミが含まれている可能性があるため <?xml から探す。なければ、何も返しません。
     Dim xmlStart As Long: xmlStart = InStr(rawStr, "<?xml")
-    If xmlStart > 0 Then
-        クリップボードからMashupFormat形式のデータを抽出する = Mid$(rawStr, xmlStart, Len(rawStr) - xmlStart)
-    Else
-        クリップボードからMashupFormat形式のデータを抽出する = rawStr ' xml始まりがないときは一旦、全部出す
-    End If
+    If xmlStart > 0 Then クリップボードからMashupFormat形式のデータを抽出する = Mid$(rawStr, xmlStart, Len(rawStr) - xmlStart) Else MsgBox "xmlデータを検知できませんでした。", vbCritical, "不正なデータです"
 End Function
 
 '***************************************************************************************************
@@ -127,7 +123,7 @@ End Function
 '               ・グループパスに対する説明文
 '---------------------------------------------------------------------------------------------------
 '* 引数    ：XML_PowerQuery     事前に抽出した「PowerQueryの定義XMLデータ」
-'* 返り値  ：バージョン情報     Client,Version,MinVersion,Culture,SafeCombine
+'* 返り値  ：メタ情報           Client,Version,MinVersion,Culture,SafeCombine
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：・2種類の返り値を返す都合上、グローバル変数による格納を行います
 '            ・引数が不正の場合、vbnullstring が返ります
@@ -135,7 +131,7 @@ End Function
 '               - Microsoft XML v6.0
 '               - Microsoft Scripting Runtime
 '***************************************************************************************************
-Function ParseMashupQueries(XML_PowerQuery As String) As String
+Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
     '空文字引数なら、ここで終わり
     If XML_PowerQuery = "" Then Exit Function
 
@@ -146,13 +142,15 @@ Function ParseMashupQueries(XML_PowerQuery As String) As String
 
 
     '------------------------------------------XMLを読み込む準備------------------------------------------
+    Const PowerQueryの定義XMLの名前空間ID As String = "http://schemas.microsoft.com/DataMashup"
+    
     Dim xmlDoc As New MSXML2.DOMDocument60
     xmlDoc.async = False                                                                            '読み込みが終わるまで待機する
     xmlDoc.validateOnParse = False                                                                  'DTD（Document Type Definition）による妥当性チェックをしない。「<!DOCTYPE 〇〇」というのがないので OFF
     xmlDoc.LoadXML XML_PowerQuery                                                                   '読み込む
-    xmlDoc.SetProperty "SelectionNamespaces", "xmlns:d='http://schemas.microsoft.com/DataMashup'"   '名前空間の指定
+    xmlDoc.SetProperty "SelectionNamespaces", "xmlns:d='" & PowerQueryの定義XMLの名前空間ID & "'"   '名前空間の指定
     
-    
+
     '------------------------ 1.グループパスに対するDescriptionを網羅的に登録 ------------------------
     '欲しい情報名を指定
     Const クエリグループ名_要素名       As String = "QueryGroup"
@@ -177,7 +175,7 @@ Function ParseMashupQueries(XML_PowerQuery As String) As String
         Do While Not parentNode Is Nothing
             '"QueryGroup"要素ゾーンに入ったら、パスを連結させます
             If parentNode.nodeName = クエリグループ名_要素名 Then groupPath = "/" & parentNode.Attributes.getNamedItem(クエリグループ名_属性名).Text & groupPath
-
+            
             '現在位置のノードを登録
             Set parentNode = parentNode.parentNode
         Loop
@@ -186,48 +184,58 @@ Function ParseMashupQueries(XML_PowerQuery As String) As String
         selfDescText = groupNode.SelectSingleNode("d:" & クエリグループ名の説明_要素名).Text
 
 
-        ' 登録
+        '登録
         グループパスに対する説明文.Add groupPath, selfDescText
         Debug.Print "グループパスに対する説明文：" & groupPath & " → " & selfDescText
     Next
-
     
     
-    '---------------------------------------2.クエリ名に対する"QueryGroup"パスを網羅的に登録 ---------------------------------------
+    '--------------------------------------- 2.クエリ名に対する"QueryGroup"パスを網羅的に登録 ---------------------------------------
     '欲しい情報名を指定
-    Const クエリ名_要素名       As String = "Query"
-    Const クエリ名_属性名       As String = "Name"
+    Const クエリ名_要素名   As String = "Query"
+    Const クエリ名_属性名   As String = "Name"
 
+    '必要な変数を用意
     Dim queryNodes As MSXML2.IXMLDOMNodeList: Set queryNodes = xmlDoc.SelectNodes("//d:" & クエリ名_要素名)      '"Query"という要素名を一覧化
-    Dim queryNode As MSXML2.IXMLDOMNode, queryName As String
+    Dim queryName As String
+
+    '探索開始
+    Dim queryNode As MSXML2.IXMLDOMNode
     For Each queryNode In queryNodes
         '現在位置の、"Name"属性値を取得
         queryName = queryNode.Attributes.getNamedItem(クエリ名_属性名).Text
         
-        'グループパス取得準備
-        'グループパス（上位のQueryGroup）をたどる
+        'グループパス取得準備として、現在のノード情報を取得
         Set parentNode = queryNode.parentNode
         
+        '初期化
         groupPath = ""
-        
+
+        '先頭の要素まで、遡って探索します
         Do While Not parentNode Is Nothing
-            If parentNode.nodeName = クエリグループ名_要素名 Then
-                Set groupNameAttr = parentNode.Attributes.getNamedItem("Name")
-                If Not groupNameAttr Is Nothing Then
-                    groupPath = "/" & groupNameAttr.Text & groupPath
-                End If
-            End If
+            '"QueryGroup"要素ゾーンに入ったら、パスを連結させます
+            If parentNode.nodeName = クエリグループ名_要素名 Then groupPath = "/" & parentNode.Attributes.getNamedItem(クエリグループ名_属性名).Text & groupPath
+
+            '現在位置のノードを登録
             Set parentNode = parentNode.parentNode
         Loop
-        
+
+
+        '登録
         クエリ名に対するグループパス情報.Add queryName, groupPath
         Debug.Print "クエリ名に対するグループパス情報：" & queryName & " → " & groupPath
     Next
 
 
-
-    '後でバージョン情報やメタ情報を、カンマ区切りで、返す予定
-    ParseMashupQueries = "EXCEL,2.145.7712.4,2.21.0.0,ja-JP,false"
+    '--------------------------------------- 3.メタ情報を返り値とする ---------------------------------------
+    With xmlDoc
+        ParseMashupQueries = WorksheetFunction.TextJoin(",", True, _
+                                .SelectSingleNode("//d:Client").Text, _
+                                .SelectSingleNode("//d:Version").Text, _
+                                .SelectSingleNode("//d:MinVersion").Text, _
+                                .SelectSingleNode("//d:Culture").Text, _
+                                .SelectSingleNode("//d:SafeCombine").Text)
+    End With
 
 End Function
 
