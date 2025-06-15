@@ -268,7 +268,7 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
 
     '--------------------------------------- 3.メタ情報を返り値とする  ---------------------------------------
     With xmlDoc
-        ParseMashupPowerQuery = WorksheetFunction.TextJoin(",", True, _
+        ParseMashupPowerQuery = WorksheetFunction.TextJoin(",", False, _
                                 .SelectSingleNode("//d:Client").Text, _
                                 .SelectSingleNode("//d:Version").Text, _
                                 .SelectSingleNode("//d:MinVersion").Text, _
@@ -315,4 +315,3 @@ Function GetPowerQueryInfos(BasePath As String)
         End With
     End If
 End Function
-
