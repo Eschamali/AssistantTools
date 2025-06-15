@@ -227,11 +227,11 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     '進捗更新
                     TaskDialogForDumpForm.Footer = i & "/" & UBound(Infos_PowerQuery)
                     TaskDialog_UpdateProgressBar i, UBound(Infos_PowerQuery)
-                    DoEvents
                 Next
             
                 'パスを記憶させる
                 Sh99_Setting.Range(RangeName_BeforePathName).Value = TaskDialogForDumpForm.ResultInput
+                DoEvents
 
                 '終了メッセージ
                 MsgBox "Mコードのエクスポートを完了しました。" & vbCrLf & "OKを押下すると、エクスプローラーが開きます。", vbInformation, "エクスポート完了"
@@ -243,6 +243,7 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                 TaskDialogForDumpForm.CloseDialog
                 
             Else
+                'Debug.Print TaskDialogForDumpForm.InputText
                 MsgBox "パスが不正あるいは、空欄です。" & vbCrLf & "なお、ドライブ直下への保存はできません。", vbCritical, "ErrorCode：" & ResultCode
             End If
         Case Else
