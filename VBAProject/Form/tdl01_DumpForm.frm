@@ -206,8 +206,8 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                 For i = 1 To UBound(Infos_PowerQuery)
                     'コメントがある場合は、それも加える
                     If Infos_PowerQuery(i, PowerQuery.Comment) <> "" Then
-                        '改行コードを統一化
-                        Infos_PowerQuery(i, PowerQuery.Comment) = Replace(Infos_PowerQuery(i, PowerQuery.Comment), vbLf, vbCrLf)
+                        'Windows用の改行(CR+LF)がない場合、Windows用改行コードに統一化
+                        If InStr(1, Infos_PowerQuery(i, PowerQuery.Comment), vbCrLf) = 0 Then Infos_PowerQuery(i, PowerQuery.Comment) = Replace(Infos_PowerQuery(i, PowerQuery.Comment), vbLf, vbCrLf)
                         
                         'コメントのフォーマットに沿って、追加
                         AddComment = "//***************************************************************************************************" & vbCrLf & _
