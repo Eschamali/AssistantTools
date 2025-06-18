@@ -167,6 +167,10 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                 'PowerQuery情報を取得
                 Dim Infos_PowerQuery: Infos_PowerQuery = GetPowerQueryCode(OpeningBooksList(TargetIndex))
                 
+                'M言語がない(配列なし)場合、ここで終了
+                If Not (IsArray(Infos_PowerQuery)) Then Exit Sub
+                
+                
                 'フォルダ保存を行う場合は、前処理する
                 Dim MetaInfos As String
                 If CBool(TaskDialogForDumpForm.ResultVerify) Then
@@ -204,7 +208,7 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     If Infos_PowerQuery(i, PowerQuery.Comment) <> "" Then
                         '改行コードを統一化
                         Infos_PowerQuery(i, PowerQuery.Comment) = Replace(Infos_PowerQuery(i, PowerQuery.Comment), vbLf, vbCrLf)
-                    
+                        
                         'コメントのフォーマットに沿って、追加
                         AddComment = "//***************************************************************************************************" & vbCrLf & _
                                      "//" & vbTab & Replace(Infos_PowerQuery(i, PowerQuery.Comment), vbCrLf, vbCrLf & "//" & vbTab) & vbCrLf & _
