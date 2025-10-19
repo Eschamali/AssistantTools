@@ -289,7 +289,7 @@ End Function
 '* 返り値  ：メタ情報     Client,Version,MinVersion,Culture,SafeCombine
 '                         ※取得に失敗すると、vbnullstring が返ります
 '***************************************************************************************************
-Function GetPowerQueryInfos(BasePath As String)
+Function GetPowerQueryInfos(BasePath As String) as String
     'PowerQueryの構造XMLデータを取得
     Dim ResultXML As String: ResultXML = クリップボードからMashupFormat形式のデータを抽出する
     
@@ -310,7 +310,7 @@ Function GetPowerQueryInfos(BasePath As String)
                 BatchCreationFolder BasePath & FolderPaths(i)
                 
                 '説明文を保存
-                SaveFile グループパスに対する説明文(FolderPaths(i)), BasePath & FolderPaths(i) & "\" & 説明ファイル名
+                SaveFile グループパスに対する説明文(FolderPaths(i)) & vbCrLf, BasePath & FolderPaths(i) & "\" & 説明ファイル名
             Next
         End With
     End If
