@@ -1643,15 +1643,23 @@ End Property
 
 Public Property Get InputText() As String
     If hEditBox Then
-            Dim lLen As Long, sText As String
-            lLen = CLng(SendMessageW(hEditBox, WM_GETTEXTLENGTH, 0, ByVal 0&) * 2)
-            If lLen Then
-                sText = Space$(lLen)
-                Call SendMessageW(hEditBox, WM_GETTEXT, lLen, ByVal sText)
-                sEditText = StrConv(sText, vbFromUnicode)
-            End If
+        Dim lLen As Long, sText As String
+        
+        ' 1. 文字数を取得（※バイト数ではなく文字数）
+        lLen = CLng(SendMessageW(hEditBox, WM_GETTEXTLENGTH, 0, ByVal 0&))
+        
+        If lLen > 0 Then
+            ' 2. バッファ確保（文字数 + 1文字分のヌル終端）
+            sText = Space$(lLen + 1)
+            
+            ' 3. テキスト取得（※第3引数は「文字数」で渡すのが一般的）
+            Call SendMessageW(hEditBox, WM_GETTEXT, lLen + 1, ByVal StrPtr(sText))
+            
+            ' 4. ヌル文字の手前までを切り出す
+            ' SendMessageWはUTF-16で書き込むので、VBAのStringそのままでOK。変換不要。
+            InputText = Left$(sText, lLen)
+        End If
     End If
-    InputText = sEditText
 End Property
 Public Property Let InputText(sText As String)
 sEditText = sText
