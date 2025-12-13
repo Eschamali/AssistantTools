@@ -179,7 +179,7 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     DoEvents
 
                     'フォルダ生成へ
-                    MetaInfos = Mod05_DumpTreeMCode.GetPowerQueryInfos(TaskDialogForDumpForm.ResultInput)
+                    MetaInfos = Mod05_DumpTreeMCode.GetPowerQueryInfos(TaskDialogForDumpForm.InputText)
                     
                     'メタ情報なしの場合、処理中断
                     If MetaInfos = "" Then
