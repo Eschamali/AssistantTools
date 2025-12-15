@@ -1657,9 +1657,10 @@ Public Property Get InputText() As String
             
             ' 4. ヌル文字の手前までを切り出す
             ' SendMessageWはUTF-16で書き込むので、VBAのStringそのままでOK。変換不要。
-            InputText = Left$(sText, lLen)
+            sEditText = Left$(sText, lLen)
         End If
     End If
+    InputText = sEditText
 End Property
 Public Property Let InputText(sText As String)
 sEditText = sText
