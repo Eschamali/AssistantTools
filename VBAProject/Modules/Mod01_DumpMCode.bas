@@ -56,3 +56,51 @@ Private Function OpeningBooks()
     '返却
     OpeningBooks = bookNames
 End Function
+
+'***************************************************************************************************
+'* 機能　　：指定Bookから、PowerQueryコードとクエリ名を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：下記のような2次元配列で返されます
+'            列
+'               1:クエリ名
+'               2:コメント
+'               3:PowerQueryコード
+'            行
+'               作られているクエリ数
+'
+'* 引数　　：TargetBookName   取得したいBook名
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：ここでは、VBAネイティブによる、PowerQueryのMコード出力を行います
+'***************************************************************************************************
+Public Function GetPowerQueryCode(ByVal targetBookName As String)
+    '必要な変数を用意
+    Dim wb As Workbook: Set wb = Workbooks(targetBookName)
+    Dim queryCount As Long: queryCount = wb.Queries.Count
+    Dim resultArray
+    Dim i As Long
+    Dim pq As WorkbookQuery
+
+    'PowerQueryが設定されていない場合はここで、Stop
+    If queryCount = 0 Then
+        MsgBox "このBookにはPower Queryが定義されていません。", vbCritical, "Not found"
+        Exit Function
+    Else
+        'クエリ数分、拡張
+        ReDim resultArray(1 To queryCount, 1 To 3)
+    End If
+
+    'クエリごとに配列へ格納
+    i = 1
+    For Each pq In wb.Queries
+        resultArray(i, PowerQueryInfos.QueryName) = pq.Name      'クエリ名
+        resultArray(i, PowerQueryInfos.Comment) = pq.Description 'コメント
+        resultArray(i, PowerQueryInfos.M_Code) = pq.Formula      'Mコード
+        
+        'カウントUP
+        i = i + 1
+    Next pq
+
+    '返却
+    GetPowerQueryCode = resultArray
+
+End Function

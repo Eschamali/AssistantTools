@@ -8,10 +8,11 @@ Option Explicit
 
 
 '***************************************************************************************************
-'                               ■■■ グローバル定義 ■■■
+'                           ■■■ DictionaryのKeyName情報 ■■■
 '***************************************************************************************************
-Public クエリ名に対するグループパス情報    As Scripting.Dictionary
-Public グループパスに対する説明文          As Scripting.Dictionary
+Public Const PowerQueryInfoKeyName01 As String = "GroupPath"
+Public Const PowerQueryInfoKeyName02 As String = "GroupPathExplanation"
+Public Const PowerQueryInfoKeyName03 As String = "MetaInfo"
 
 
 
@@ -113,71 +114,34 @@ Private Function BytesToString(bytes() As Byte, Optional encoding As String = "U
     End With
 End Function
 
-'***************************************************************************************************
-'* 機能　　：指定した引数で、ファイル保存します。
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：WriteText      書き込む内容を渡します。
-'            SaveFilePass   入力した絶対パスにファイルを保存します。
-'            OverWrite      上書きしたくない場合は、Falseで
-'***************************************************************************************************
-Private Sub SaveFile(writeText As String, ByVal SaveFilePass As String, Optional OverWrite As Boolean = True)
-    '上書きしない場合、後続処理しない
-    If Not OverWrite And Dir(SaveFilePass, vbNormal) <> "" Then Exit Sub
-    
-    '文字なしも、後続処理しない
-    If writeText = "" Then Exit Sub
-
-    Dim tmp() As Byte 'BOM付きを外すための一時格納用
-    With CreateObject("ADODB.Stream")
-        '書き込み形式の設定
-        .Charset = "UTF-8" 'UTF-8
-        .Type = 2 'テキストモード
-        .Open '上記の設定で、ストリームを開く
-
-        'レスポンス結果を書き込む(末尾に改行コードなし)
-        .writeText writeText, 0
-        
-        'BOM付きを外す処理
-        .Position = 0 'ストリームの位置を0にセット
-        .Type = 1 'データの種類をバイナリデータに変更
-        .Position = 3 'ストリームの位置を3にセットして、BOMデータを飛ばす
-        tmp = .Read 'ストリームの内容を一時格納用変数に保存。先程セットした始点3から最後まで
-        .Close '一旦ストリームを閉じる（リセット）
-
-        .Open 'ストリームを開く
-        .Write tmp 'ストリームに一時格納したデータを流し込む
-        .SaveToFile SaveFilePass, 2 'ファイルに上書き保存
-        .Close
-    End With
-
-End Sub
-
 
 
 '***************************************************************************************************
 '         ■■■ "Microsoft Mashup Format"形式のPowerQueryの定義データを解析 ■■■
 '***************************************************************************************************
-'* 機能    ：事前に抽出した「PowerQueryの定義XMLデータ」を基に、下記2種類の「Scripting.Dictionary」を作成します
+'* 機能    ：事前に抽出した「PowerQueryの定義XMLデータ」を基に、下記3種類の「Scripting.Dictionary」を作成します
 '               ・クエリ名に対するグループパス情報
 '               ・グループパスに対する説明文
+'               ・メタデータ
 '---------------------------------------------------------------------------------------------------
 '* 引数    ：XML_PowerQuery     事前に抽出した「PowerQueryの定義XMLデータ」
-'* 返り値  ：メタ情報           Client,Version,MinVersion,Culture,SafeCombine
+'* 返り値  ：Dictionary形式
+'               ┗・PowerQueryInfoKeyName01
+'               ┗・PowerQueryInfoKeyName02
+'               ┗・PowerQueryInfoKeyName03
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：・2種類の返り値を返す都合上、グローバル変数による格納を行います
-'            ・引数が不正の場合、vbnullstring が返ります
-'            ・下記の参照設定が必要です
+'* 注意事項：下記の参照設定が必要です
 '               - Microsoft XML v6.0
 '               - Microsoft Scripting Runtime
 '***************************************************************************************************
-Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
+Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As Dictionary
     '空文字引数なら、ここで終わり
     If XML_PowerQuery = "" Then Exit Function
 
 
     '------------------------------------------初期化------------------------------------------
-    Set クエリ名に対するグループパス情報 = New Scripting.Dictionary
-    Set グループパスに対する説明文 = New Scripting.Dictionary
+    Dim クエリ名に対するグループパス情報    As Scripting.Dictionary: Set クエリ名に対するグループパス情報 = New Scripting.Dictionary
+    Dim グループパスに対する説明文          As Scripting.Dictionary: Set グループパスに対する説明文 = New Scripting.Dictionary
 
 
     '------------------------------------------XMLを読み込む準備------------------------------------------
@@ -266,16 +230,24 @@ Private Function ParseMashupPowerQuery(XML_PowerQuery As String) As String
     Next
 
 
-    '--------------------------------------- 3.メタ情報を返り値とする  ---------------------------------------
+    '--------------------------------------- 3.メタ情報を取得  ---------------------------------------
+    Dim MetaInfo As Dictionary: Set MetaInfo = New Dictionary
     With xmlDoc
-        ParseMashupPowerQuery = WorksheetFunction.TextJoin(",", False, _
-                                .SelectSingleNode("//d:Client").Text, _
-                                .SelectSingleNode("//d:Version").Text, _
-                                .SelectSingleNode("//d:MinVersion").Text, _
-                                .SelectSingleNode("//d:Culture").Text, _
-                                .SelectSingleNode("//d:SafeCombine").Text)
+        MetaInfo.Add "Clien", .SelectSingleNode("//d:Client").Text
+        MetaInfo.Add "Version", .SelectSingleNode("//d:Version").Text
+        MetaInfo.Add "MinVersion", .SelectSingleNode("//d:MinVersion").Text
+        MetaInfo.Add "Culture", .SelectSingleNode("//d:Culture").Text
+        MetaInfo.Add "SafeCombine", .SelectSingleNode("//d:SafeCombine").Text
     End With
 
+
+    '--------------------------------------- 4.Dictionaryとして、複数情報を格納して返却  ---------------------------------------
+    Set ParseMashupPowerQuery = New Dictionary
+    With ParseMashupPowerQuery
+        .Add PowerQueryInfoKeyName01, クエリ名に対するグループパス情報      '`クエリ名`を渡すと、それに所属するグループパスが返されます
+        .Add PowerQueryInfoKeyName02, グループパスに対する説明文            '`グループパス`を渡すと、それに対する説明文が返されます
+        .Add PowerQueryInfoKeyName03, MetaInfo                              'メタ情報を得れます
+    End With
 End Function
 
 
@@ -283,36 +255,18 @@ End Function
 '***************************************************************************************************
 '                       ■■■ タスクダイアログから呼び出す ■■■
 '***************************************************************************************************
-'* 機能    ：PowerQuery構造XMLを解析します
+'* 機能    ：PowerQuery構造XMLを解析し、複数情報を取得します
 '---------------------------------------------------------------------------------------------------
-'* 引数    ：BasePath     保存先のベースフォルダパス
-'* 返り値  ：メタ情報     Client,Version,MinVersion,Culture,SafeCombine
-'                         ※取得に失敗すると、vbnullstring が返ります
+'* 返り値  ：Dictionary形式
+'               ┗・PowerQueryInfoKeyName01
+'               ┗・PowerQueryInfoKeyName02
+'               ┗・PowerQueryInfoKeyName03
 '***************************************************************************************************
-Function GetPowerQueryInfos(BasePath As String)
+Function GetPowerQueryXML() As Dictionary
     'PowerQueryの構造XMLデータを取得
     Dim ResultXML As String: ResultXML = クリップボードからMashupFormat形式のデータを抽出する
-    
-    '説明文の保存ファイル名
-    Const 説明ファイル名 As String = "説明.txt"
-    
-    '情報があったら、次へ
-    If StrPtr(ResultXML) Then
-        'メタ情報を取得
-        GetPowerQueryInfos = ParseMashupPowerQuery(ResultXML)
-    
-        'グループ情報分、作成
-        Dim i As Long, 説明文 As String, FolderPaths
-        With グループパスに対する説明文
-            FolderPaths = .Keys
-            For i = .Count - 1 To 0 Step -1
-                'フォルダを作成
-                BatchCreationFolder BasePath & FolderPaths(i)
-                
-                '説明文を保存
-                説明文 = グループパスに対する説明文(FolderPaths(i))
-                If 説明文 <> "" Then SaveFile 説明文 & vbCrLf, BasePath & FolderPaths(i) & "\" & 説明ファイル名
-            Next
-        End With
-    End If
+
+    'XML解析結果を取得
+    'クリップボードから、XML情報が取れずに空の場合、`Nothing`で返却
+    If ResultXML <> "" Then Set GetPowerQueryXML = ParseMashupPowerQuery(ResultXML)
 End Function

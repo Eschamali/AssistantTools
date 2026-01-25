@@ -26,26 +26,27 @@ Option Explicit
 '***************************************************************************************************
 ' 機能：様々な設定値等をタスクダイアログのイベント等からでもアクセスできるように定義します。
 '===================================================================================================
-Private WithEvents TaskDialogForDumpForm    As cTaskDialog      'タスクダイアログ本体
+Private WithEvents TaskDialogForDumpForm    As cTaskDialog          'タスクダイアログ本体
 Attribute TaskDialogForDumpForm.VB_VarHelpID = -1
 
-Private OpeningBooksList                                        '現在開いているBookのリスト
-Private BeforeMARQUEE                       As Boolean          '以前にMARQUEEをしたか？
+Private OpeningBooksList                                            '現在開いているBookのリスト
+Private BeforeMARQUEE                       As Boolean              '以前にMARQUEEをしたか？
 
-Const M言語ファイル拡張子名                 As String = ".pqm"  '拡張子
+Private Const M言語ファイル拡張子名         As String = ".pqm"      '拡張子
+Private Const 説明ファイル名                As String = "説明.txt"  'グループパスに記載してる説明文を保存する際のファイル名
+
+'PowerQueryの情報
+Public Enum PowerQueryInfos
+    QueryName = 1
+    Comment
+    M_Code
+End Enum
 
 'ボタンID
 Private Enum ButtonAchievementID
     出力 = 101
     フォルダを選択
     閉じる
-End Enum
-
-'PowerQueryの情報
-Private Enum PowerQuery
-    QueryName = 1
-    Comment
-    M_Code
 End Enum
 
 
@@ -164,54 +165,66 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     TargetIndex = TaskDialogForDumpForm.ResultComboIndex + 1
                 End If
             
-                'PowerQuery情報を取得
-                Dim Infos_PowerQuery: Infos_PowerQuery = GetPowerQueryCode(OpeningBooksList(TargetIndex))
+                'PowerQueryのMコード情報を取得
+                Dim PowerQuery_M言語: PowerQuery_M言語 = Mod01_DumpMCode.GetPowerQueryCode(OpeningBooksList(TargetIndex))
                 
                 'M言語がない(配列なし)場合、ここで終了
-                If Not (IsArray(Infos_PowerQuery)) Then Exit Sub
+                If Not (IsArray(PowerQuery_M言語)) Then Exit Sub
                 
                 
-                'フォルダ保存を行う場合は、前処理する
-                Dim MetaInfos As String
+                'フォルダ保存を行う場合は、下記の追加処理を行う
+                '・PowerQueryのグループパスに基づいたフォルダ作成
+                '・PowerQueryのグループパスに基づいた説明テキストファイルを作成
                 If CBool(TaskDialogForDumpForm.ResultVerify) Then
                     '進捗更新
                     TaskDialogForDumpForm.Footer = "フォルダを作成中..."
                     DoEvents
 
-                    'フォルダ生成へ
-                    MetaInfos = Mod05_DumpTreeMCode.GetPowerQueryInfos(TaskDialogForDumpForm.InputText)
+                    'PowerQueryの構造XML解析済みDictionayデータを取得し、失敗時は終了
+                    Dim PowerQuery_Group As Dictionary: Set PowerQuery_Group = Mod05_DumpTreeMCode.GetPowerQueryXML()
+                    If PowerQuery_Group Is Nothing Then TaskDialogForDumpForm.Footer = "Ready...": Exit Sub
                     
-                    'メタ情報なしの場合、処理中断
-                    If MetaInfos = "" Then
-                        '通知
-                        MsgBox "フォルダの作成に失敗しました", vbCritical, "PowerQuery XML取得エラー"
+                    '事前定義
+                    Dim FolderPaths
+                    FolderPaths = PowerQuery_Group(PowerQueryInfoKeyName02).Keys
+                    
+                    'グループ情報がある分の処理を行います
+                    For i = 0 To PowerQuery_Group(PowerQueryInfoKeyName02).Count - 1
+                        'グループパスを基に、フォルダを作成
+                        ResultCode = BatchCreationFolder(TaskDialogForDumpForm.InputText & FolderPaths(i))
                         
-                        '進捗更新
-                        TaskDialogForDumpForm.Footer = "Ready..."
-                        DoEvents
-                      
-                        Exit Sub
-                    End If
+                        'フォルダ作成に失敗したら、停止
+                        If ResultCode <> 0 And ResultCode <> 183 Then
+                            '通知
+                            MsgBox "フォルダの作成に失敗しました。", vbCritical, "ResultCode:" & ResultCode
+                            
+                            '進捗更新
+                            TaskDialogForDumpForm.Footer = "Ready..."
+                            DoEvents
+                          
+                            Exit Sub
+                        End If
+                        
+                        'グループパスに対する説明文を保存
+                        SaveFile PowerQuery_Group(PowerQueryInfoKeyName02)(FolderPaths(i)), TaskDialogForDumpForm.InputText & FolderPaths(i) & "\" & 説明ファイル名
+                    Next
                 End If
-                
-                '進捗更新
-                TaskDialogForDumpForm.Footer = "0/" & UBound(Infos_PowerQuery)
-                DoEvents
-                
-                '情報がない場合(配列なし)はここで、終了
-                If Not (IsArray(Infos_PowerQuery)) Then Exit Sub
 
-                'ファイル出力
+                '進捗更新
+                TaskDialogForDumpForm.Footer = "0/" & UBound(PowerQuery_M言語)
+                DoEvents
+
+                'Mコードをファイル出力
                 Dim AddComment As String
-                For i = 1 To UBound(Infos_PowerQuery)
+                For i = 1 To UBound(PowerQuery_M言語)
                     'コメントがある場合は、それも加える
-                    If Infos_PowerQuery(i, PowerQuery.Comment) <> "" Then
+                    If PowerQuery_M言語(i, PowerQueryInfos.Comment) <> "" Then
                         'Windows用の改行(CR+LF)がない場合、Windows用改行コードに統一化
-                        If InStr(1, Infos_PowerQuery(i, PowerQuery.Comment), vbCrLf) = 0 Then Infos_PowerQuery(i, PowerQuery.Comment) = Replace(Infos_PowerQuery(i, PowerQuery.Comment), vbLf, vbCrLf)
+                        If InStr(1, PowerQuery_M言語(i, PowerQueryInfos.Comment), vbCrLf) = 0 Then PowerQuery_M言語(i, PowerQueryInfos.Comment) = Replace(PowerQuery_M言語(i, PowerQueryInfos.Comment), vbLf, vbCrLf)
                         
                         'コメントのフォーマットに沿って、追加
                         AddComment = "//***************************************************************************************************" & vbCrLf & _
-                                     "//" & vbTab & Replace(Infos_PowerQuery(i, PowerQuery.Comment), vbCrLf, vbCrLf & "//" & vbTab) & vbCrLf & _
+                                     "//" & vbTab & Replace(PowerQuery_M言語(i, PowerQueryInfos.Comment), vbCrLf, vbCrLf & "//" & vbTab) & vbCrLf & _
                                      "//***************************************************************************************************" & vbCrLf & vbCrLf & vbCrLf & vbCrLf
                     Else
                         'コメントなし
@@ -219,22 +232,22 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     End If
 
                     '保存準備
-                    Dim 保存ファイル名 As String: 保存ファイル名 = Infos_PowerQuery(i, PowerQuery.QueryName)
+                    Dim クエリ名 As String: クエリ名 = PowerQuery_M言語(i, PowerQueryInfos.QueryName)
                     
-                    'チェックボックスに応じて、フォルダへ保存するようにする
+                    'チェックボックスに応じて、グループパスに基づいたフォルダへ保存するようにする
                     If CBool(TaskDialogForDumpForm.ResultVerify) Then
-                        SaveFile AddComment & Infos_PowerQuery(i, PowerQuery.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, Mod05_DumpTreeMCode.クエリ名に対するグループパス情報(Replace(保存ファイル名, M言語ファイル拡張子名, "")), 保存ファイル名)
+                        SaveFile AddComment & PowerQuery_M言語(i, PowerQueryInfos.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, PowerQuery_Group(PowerQueryInfoKeyName01)(クエリ名), クエリ名 & M言語ファイル拡張子名)
                     Else
-                        SaveFile AddComment & Infos_PowerQuery(i, PowerQuery.M_Code), TaskDialogForDumpForm.ResultInput & "\" & 保存ファイル名
+                        SaveFile AddComment & PowerQuery_M言語(i, PowerQueryInfos.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, クエリ名 & M言語ファイル拡張子名)
                     End If
                     
                     '進捗更新
-                    TaskDialogForDumpForm.Footer = i & "/" & UBound(Infos_PowerQuery)
-                    TaskDialog_UpdateProgressBar i, UBound(Infos_PowerQuery)
+                    TaskDialogForDumpForm.Footer = i & "/" & UBound(PowerQuery_M言語)
+                    TaskDialog_UpdateProgressBar i, UBound(PowerQuery_M言語)
                 Next
             
-                'パスを記憶させる
-                Sh99_Setting.Range(RangeName_BeforePathName).Value = TaskDialogForDumpForm.ResultInput
+                '前回パスとして、記憶させる
+                Sh99_Setting.Range(RangeName_BeforePathName).Value = TaskDialogForDumpForm.InputText
                 DoEvents
 
                 '終了メッセージ
@@ -273,56 +286,6 @@ End Sub
 
 
 '***************************************************************************************************
-'                                   ■■■ 各種情報収集 ■■■
-'***************************************************************************************************
-'* 機能　　：指定Bookから、PowerQueryコードとクエリ名を取得します。
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：下記のような2次元配列で返されます
-'            列
-'               1:クエリ名
-'               2:コメント
-'               3:PowerQueryコード
-'            行
-'               作られているクエリ数
-'
-'* 引数　　：TargetBookName   取得したいBook名
-'***************************************************************************************************
-Private Function GetPowerQueryCode(ByVal targetBookName As String)
-    '必要な変数を用意
-    Dim wb As Workbook: Set wb = Workbooks(targetBookName)
-    Dim queryCount As Long: queryCount = wb.Queries.Count
-    Dim resultArray
-    Dim i As Long
-    Dim pq As WorkbookQuery
-
-    'PowerQueryが設定されていない場合はここで、Stop
-    If queryCount = 0 Then
-        MsgBox "このBookにはPower Queryが定義されていません。", vbCritical, "Not found"
-        Exit Function
-    Else
-        'クエリ数分、拡張
-        ReDim resultArray(1 To queryCount, 1 To 3)
-    End If
-
-    'クエリごとに配列へ格納
-    i = 1
-    For Each pq In wb.Queries
-        resultArray(i, PowerQuery.QueryName) = pq.Name & M言語ファイル拡張子名  'クエリ名
-        resultArray(i, PowerQuery.Comment) = pq.Description                     'コメント
-        resultArray(i, PowerQuery.M_Code) = pq.Formula                          'Mコード
-        
-        'カウントUP
-        i = i + 1
-    Next pq
-
-    '返却
-    GetPowerQueryCode = resultArray
-
-End Function
-
-
-
-'***************************************************************************************************
 '                          ■■■ ファイル保存プロシージャ ■■■
 '***************************************************************************************************
 '* 機能　　：指定した引数で、ファイル保存します。
@@ -333,9 +296,10 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：保存の文字コードは、「UTF-8(BOMなし)」のみです。
 '***************************************************************************************************
-Private Sub SaveFile(ByVal writeText As String, ByVal SaveFilePass As String, Optional OverWrite As Boolean = True)
-    '上書きしない場合、後続処理しない
-    If Not OverWrite And Dir(SaveFilePass, vbNormal) <> "" Then Exit Sub
+Private Sub SaveFile(ByVal writeText As String, ByVal SaveFilePass As String)
+    '空文字の場合、即抜け
+    If writeText = "" Then Exit Sub
+
 
     Dim tmp() As Byte 'BOM付きを外すための一時格納用
     With CreateObject("ADODB.Stream")
