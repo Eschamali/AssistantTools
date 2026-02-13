@@ -73,45 +73,11 @@ Private Function クリップボードからMashupFormat形式のデータを抽
 
 
     'バイト配列から、テキストを取得
-    Dim rawStr As String: rawStr = BytesToString(byteData)
+    Dim rawStr As String: rawStr = CharConv.BytesToString(byteData)
 
     ' バイナリの先頭にゴミが含まれている可能性があるため <?xml から探す。なければ、何も返しません。
     Dim xmlStart As Long: xmlStart = InStr(rawStr, "<?xml")
     If xmlStart > 0 Then クリップボードからMashupFormat形式のデータを抽出する = Mid$(rawStr, xmlStart, Len(rawStr) - xmlStart) Else MsgBox "xmlデータを検知できませんでした。", vbCritical, "不正なデータです"
-End Function
-
-'***************************************************************************************************
-'* 機能　　：Byte() → String に変換するヘルパー関数です
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：bytes()    バイト配列
-'            encoding   エンコード名称(デフォルト：UTF-8)
-'***************************************************************************************************
-Private Function BytesToString(bytes() As Byte, Optional encoding As String = "UTF-8") As String
-    With CreateObject("ADODB.Stream")
-        '読み込みモードを設定
-        .Type = 1 'バイナリ
-        
-        '開く
-        .Open
-        
-        'Streamへ書き込む
-        .Write bytes
-        
-        '先頭スタートにする
-        .Position = 0
-        
-        'モードを変更
-        .Type = 2 'テキスト
-        
-        '文字コード名を設定
-        .Charset = encoding
-        
-        'エンコードした内容を返す
-        BytesToString = .ReadText
-        
-        '後始末
-        .Close
-    End With
 End Function
 
 

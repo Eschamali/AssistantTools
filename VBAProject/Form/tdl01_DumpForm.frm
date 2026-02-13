@@ -206,7 +206,7 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                         End If
                         
                         'グループパスに対する説明文を保存
-                        SaveFile PowerQuery_Group(PowerQueryInfoKeyName02)(FolderPaths(i)), TaskDialogForDumpForm.InputText & FolderPaths(i) & "\" & 説明ファイル名
+                        SaveFile PowerQuery_Group(PowerQueryInfoKeyName02)(FolderPaths(i)), TaskDialogForDumpForm.InputText & FolderPaths(i), 説明ファイル名
                     Next
                 End If
 
@@ -236,9 +236,9 @@ Private Sub TaskDialogForDumpForm_ButtonClick(ByVal ButtonID As Long)
                     
                     'チェックボックスに応じて、グループパスに基づいたフォルダへ保存するようにする
                     If CBool(TaskDialogForDumpForm.ResultVerify) Then
-                        SaveFile AddComment & PowerQuery_M言語(i, PowerQueryInfos.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, PowerQuery_Group(PowerQueryInfoKeyName01)(クエリ名), クエリ名 & M言語ファイル拡張子名)
+                        SaveFile AddComment & PowerQuery_M言語(i, PowerQueryInfos.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, PowerQuery_Group(PowerQueryInfoKeyName01)(クエリ名)), クエリ名 & M言語ファイル拡張子名
                     Else
-                        SaveFile AddComment & PowerQuery_M言語(i, PowerQueryInfos.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput, クエリ名 & M言語ファイル拡張子名)
+                        SaveFile AddComment & PowerQuery_M言語(i, PowerQueryInfos.M_Code), WorksheetFunction.TextJoin("\", True, TaskDialogForDumpForm.ResultInput), クエリ名 & M言語ファイル拡張子名
                     End If
                     
                     '進捗更新
@@ -290,40 +290,20 @@ End Sub
 '***************************************************************************************************
 '* 機能　　：指定した引数で、ファイル保存します。
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：WriteText      書き込む内容を渡します。
-'            SaveFilePass   入力した絶対パスにファイルを保存します。
-'            OverWrite      上書きしたくない場合は、Falseで
+'* 引数　　：WriteText       書き込む内容を渡します。
+'            BasePath        保存先のベースパス
+'            SavePath        保存相対パス
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：保存の文字コードは、「UTF-8(BOMなし)」のみです。
 '***************************************************************************************************
-Private Sub SaveFile(ByVal writeText As String, ByVal SaveFilePass As String)
-    '空文字の場合、即抜け
+Private Sub SaveFile(ByVal writeText As String, ByVal BasePath As String, ByVal SavePath As String)
+    '空文字の場合、即抜け。保存しません
     If writeText = "" Then Exit Sub
 
-
-    Dim tmp() As Byte 'BOM付きを外すための一時格納用
-    With CreateObject("ADODB.Stream")
-        '書き込み形式の設定
-        .Charset = "UTF-8" 'UTF-8
-        .Type = 2 'テキストモード
-        .Open '上記の設定で、ストリームを開く
-
-        'レスポンス結果を書き込む(末尾に改行コードあり)
-        .writeText writeText, 1
-        
-        'BOM付きを外す処理
-        .Position = 0 'ストリームの位置を0にセット
-        .Type = 1 'データの種類をバイナリデータに変更
-        .Position = 3 'ストリームの位置を3にセットして、BOMデータを飛ばす
-        tmp = .Read 'ストリームの内容を一時格納用変数に保存。先程セットした始点3から最後まで
-        .Close '一旦ストリームを閉じる（リセット）
-
-        .Open 'ストリームを開く
-        .Write tmp 'ストリームに一時格納したデータを流し込む
-        .SaveToFile SaveFilePass, 2 'ファイルに上書き保存
-        .Close
+    '専用API経由で保存
+    With CharConv
+        .BytesToSaveFile .BytesFromString(writeText & vbCrLf), BasePath, SavePath
     End With
-
 End Sub
 
 
